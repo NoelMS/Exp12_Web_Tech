@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vitality Now | Ex 12 Full Stack Web Application Using Node.js, React.js and MongoDB</title><style>
+:root{--forest:#1b3823;--leaf:#2c5e3b;--sprout:#4ca165;--mint:#e8f5e9;--ink:#1f2a22;--clay:#b8561f}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Georgia,Garamond,serif}
+body{background:var(--mint);color:var(--ink);line-height:1.55}
+header{background:linear-gradient(var(--forest),var(--leaf));color:#fff;padding:26px 24px 22px}
+header .logo{letter-spacing:5px;font-weight:bold;font-size:1.6rem}
+header p{color:#d9ead3;font-style:italic;margin-top:4px}
+main{max-width:940px;margin:26px auto;padding:0 16px}
+h1{color:var(--leaf);font-size:1.5rem;margin-bottom:6px}
+h2{color:var(--leaf);margin:30px 0 10px;font-size:1.2rem;border-bottom:2px solid #c5dcc9;padding-bottom:4px}
+.note{background:#fff7e8;border-left:4px solid var(--clay);padding:10px 14px;margin:16px 0;border-radius:0 6px 6px 0}
+pre{background:#1a1a1a;color:#e6e6e6;padding:14px;border-radius:8px;overflow-x:auto;font:13px/1.45 Consolas,'Courier New',monospace;margin:8px 0}
+pre code{font-family:inherit}
+.file{font:bold 13px Consolas,monospace;color:var(--leaf);margin-top:14px}
+figure{margin:14px 0}
+figure img{max-width:100%;border:1px solid #9db8a2;border-radius:8px;background:#fff}
+figcaption{font-size:.9rem;color:#4a5a4e;margin-top:4px}
+footer{text-align:center;padding:24px;color:#4a5a4e;font-size:.9rem}
+a{color:var(--leaf)}
+a:focus-visible{outline:3px solid var(--clay);outline-offset:2px}
+</style></head>
+<body><header><div class="logo">VITALITY NOW</div><p>Health &amp; Wellness Blog &mdash; Web Technology Lab</p></header>
+<main><h1>Ex. No. 12 &ndash; Full Stack Web Application Using Node.js, React.js and MongoDB</h1><p>React (Vite) front end, Express REST API and MongoDB storage implementing create, read, update and delete for student records.</p>
+<div class="note">This is a server-side exercise, so GitHub Pages can only show the source and the output captured from a real local run (Node.js, MongoDB 8.2 and mongosh on the author's machine). The React front end calls <code>http://localhost:5000</code>, so the live app only works when the backend is running locally.</div>
+<h2>Source code</h2><div class="file">backend/server.js</div><pre><code>require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { MongoClient, ObjectId } = require('mongodb');
+
+const app = express();
+const client = new MongoClient(process.env.MONGO_URI);
+
+app.use(cors());
+app.use(express.json());
+
+let students;
+
+app.get('/api/students', async (req, res) =&gt; {
+    try {
+        const records = await students.find({}).toArray();
+        res.json(records);
+    } catch (error) {
+        res.status(500).json({ error: 'Unable to fetch students' });
+    }
+});
+
+app.post('/api/students', async (req, res) =&gt; {
+    try {
+        const { name, department } = req.body;
+
+        if (typeof name !== 'string' || !name.trim() ||
+            typeof department !== 'string' || !department.trim()) {
+            return res.status(400).json({
+                error: 'Name and department are required'
+            });
+        }
+
+        const student = {
+            name: name.trim(),
+            department: department.trim()
+        };
+
+        const result = await students.insertOne(student);
+
+        res.status(201).json({
+            _id: result.insertedId,
+            ...student
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Unable to add student' });
+    }
+});
+
+app.put('/api/students/:id', async (req, res) =&gt; {
+    try {
+        const { id } = req.params;
+        const { name, department } = req.body;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid student ID' });
+        }
+
+        if (typeof name !== 'string' || !name.trim() ||
+            typeof department !== 'string' || !department.trim()) {
+            return res.status(400).json({
+                error: 'Name and department are required'
+            });
+        }
+
+        const result = await students.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: {
+                name: name.trim(),
+                department: department.trim()
+            }}
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+
+        res.json({ message: 'Student updated successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Unable to update student' });
+    }
+});
+
+app.delete('/api/students/:id', async (req, res) =&gt; {
+    try {
+        const { id } = req.params;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid student ID' });
+        }
+
+        const result = await students.deleteOne({
+            _id: new ObjectId(id)
+        });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+
+        res.json({ message: 'Student deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Unable to delete student' });
+    }
+});
+
+async function startServer() {
+    try {
+        await client.connect();
+
+        const db = client.db('CollegeDB');
+        students = db.collection('Students');
+
+        app.listen(process.env.PORT || 5000, () =&gt; {
+            console.log('Backend running on port 5000');
+        });
+    } catch (error) {
+        console.error('Database connection failed:', error.message);
+        process.exit(1);
+    }
+}
+
+startServer();
+</code></pre>
+<div class="file">frontend/src/App.jsx</div><pre><code>import { useEffect, useState } from 'react';
+import './App.css';
+
+const API = 'http://localhost:5000/api/students';
+
+function App() {
+    const [students, setStudents] = useState([]);
+    const [name, setName] = useState('');
+    const [department, setDepartment] = useState('');
+    const [editId, setEditId] = useState(null);
+    const [message, setMessage] = useState('');
+
+    async function loadStudents() {
+        try {
+            const response = await fetch(API);
+            if (!response.ok) throw new Error('Unable to load students');
+            setStudents(await response.json());
+        } catch (error) {
+            setMessage(error.message);
+        }
+    }
+
+    useEffect(() =&gt; {
+        loadStudents();
+    }, []);
+
+    async function handleSubmit(event) {
+        event.preventDefault();
+        setMessage('');
+
+        try {
+            const response = await fetch(
+                editId ? `${API}/${editId}` : API,
+                {
+                    method: editId ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, department })
+                }
+            );
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            setName('');
+            setDepartment('');
+            setEditId(null);
+            setMessage(data.message || 'Student added successfully');
+            await loadStudents();
+        } catch (error) {
+            setMessage(error.message || 'Request failed');
+        }
+    }
+
+    function editStudent(student) {
+        setEditId(student._id);
+        setName(student.name);
+        setDepartment(student.department);
+        setMessage('');
+    }
+
+    async function deleteStudent(id) {
+        if (!window.confirm('Delete this student?')) return;
+
+        try {
+            const response = await fetch(`${API}/${id}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            setMessage(data.message);
+            await loadStudents();
+        } catch (error) {
+            setMessage(error.message);
+        }
+    }
+
+    return (
+        &lt;main className="container"&gt;
+            &lt;h1&gt;Student Management System&lt;/h1&gt;
+
+            &lt;form onSubmit={handleSubmit}&gt;
+                &lt;input
+                    placeholder="Student Name"
+                    value={name}
+                    onChange={e =&gt; setName(e.target.value)}
+                    required
+                /&gt;
+
+                &lt;input
+                    placeholder="Department"
+                    value={department}
+                    onChange={e =&gt; setDepartment(e.target.value)}
+                    required
+                /&gt;
+
+                &lt;button type="submit"&gt;
+                    {editId ? 'Update Student' : 'Add Student'}
+                &lt;/button&gt;
+
+                {editId &amp;&amp; (
+                    &lt;button
+                        type="button"
+                        onClick={() =&gt; {
+                            setEditId(null);
+                            setName('');
+                            setDepartment('');
+                        }}
+                    &gt;
+                        Cancel
+                    &lt;/button&gt;
+                )}
+            &lt;/form&gt;
+
+            {message &amp;&amp; &lt;p role="status"&gt;{message}&lt;/p&gt;}
+
+            &lt;h2&gt;Student Records&lt;/h2&gt;
+
+            &lt;table&gt;
+                &lt;thead&gt;
+                    &lt;tr&gt;
+                        &lt;th&gt;Name&lt;/th&gt;
+                        &lt;th&gt;Department&lt;/th&gt;
+                        &lt;th&gt;Actions&lt;/th&gt;
+                    &lt;/tr&gt;
+                &lt;/thead&gt;
+
+                &lt;tbody&gt;
+                    {students.map(student =&gt; (
+                        &lt;tr key={student._id}&gt;
+                            &lt;td&gt;{student.name}&lt;/td&gt;
+                            &lt;td&gt;{student.department}&lt;/td&gt;
+                            &lt;td&gt;
+                                &lt;button
+                                    onClick={() =&gt; editStudent(student)}
+                                &gt;
+                                    Edit
+                                &lt;/button&gt;
+
+                                &lt;button
+                                    onClick={() =&gt; deleteStudent(student._id)}
+                                &gt;
+                                    Delete
+                                &lt;/button&gt;
+                            &lt;/td&gt;
+                        &lt;/tr&gt;
+                    ))}
+                &lt;/tbody&gt;
+            &lt;/table&gt;
+        &lt;/main&gt;
+    );
+}
+
+export default App;
+</code></pre>
+<div class="file">frontend/src/App.css</div><pre><code>.container {
+    max-width: 850px;
+    margin: 40px auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+h1, h2 {
+    color: #243b53;
+}
+
+form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+input {
+    padding: 10px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+}
+
+button {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 2px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+th {
+    background: #eaf1f8;
+}
+</code></pre>
+<h2>Output</h2><figure><img src="img/term_backend.png" alt="Backend started"><figcaption>Backend started</figcaption></figure>
+<figure><img src="img/01_empty.png" alt="Frontend loaded"><figcaption>Frontend loaded</figcaption></figure>
+<figure><img src="img/03_three.png" alt="Three students added"><figcaption>Three students added</figcaption></figure>
+<figure><img src="img/04_editing.png" alt="Editing a record"><figcaption>Editing a record</figcaption></figure>
+<figure><img src="img/05_updated.png" alt="After update"><figcaption>After update</figcaption></figure>
+<figure><img src="img/06_deleted.png" alt="After delete"><figcaption>After delete</figcaption></figure>
+<figure><img src="img/term_api.png" alt="REST API checks, including validation errors"><figcaption>REST API checks, including validation errors</figcaption></figure>
+<figure><img src="img/term_mongo.png" alt="Documents stored in MongoDB"><figcaption>Documents stored in MongoDB</figcaption></figure>
+<p style="margin-top:24px"><a href="https://github.com/NoelMS/Exp12_Web_Tech">View the repository on GitHub</a></p></main>
+<footer>Vitality Now &middot; Web Technology Lab &middot; Ex. 12</footer></body></html>
